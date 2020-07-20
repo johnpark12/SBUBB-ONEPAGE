@@ -1,0 +1,6 @@
+So the way that app functions is by having a content script scrape and format all the relevent data which is then sent to the background page?
+Or should the scraping automatically add to the injected html?
+Other issue is that the element loading is dynamic, so I'm going to have to set onload triggers to make sure data is only scraped when relevent elements are loaded.
+
+MUST be a background page in order to be consistent.
+Must also redirect in the background to be able to load everything and collect all the info.

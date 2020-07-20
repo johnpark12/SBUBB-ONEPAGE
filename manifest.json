@@ -1,0 +1,24 @@
+{
+    "manifest_version": 2,
+  
+    "name": "SBU Blackboard Quick View Extension",
+    "description": "Just something quick to let you view ",
+    "version": "0.5",
+  
+    "browser_action": {
+     "default_popup": "popup.html"
+    },
+    "permissions": [
+     "activeTab"
+     ],
+     "content_scripts": [
+        {
+        "matches": ["https://blackboard.stonybrook.edu/webapps/portal/execute/tabs/tabAction?tab_tab_group_id=_4_1"],
+        "js": ["genSummary.js"],
+        "css": ["summary.css"]
+        }
+      ],
+      "web_accessible_resources":[
+          "summary.html"
+      ]
+}
