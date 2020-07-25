@@ -14,7 +14,7 @@
      "content_scripts": [
         {
         "matches": ["https://blackboard.stonybrook.edu/webapps/portal/execute/tabs/tabAction?tab_tab_group_id=_4_1"],
-        "js": ["genSummary.js"],
+        "js": ["scraping.js","genSummary.js"],
         "css": ["summary.css"]
         }
       ],
