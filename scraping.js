@@ -1,27 +1,69 @@
 // Must update all the functions to work with single courses. So that they can be used as part of an "onclick" in the genSummary.js
 // All functions should return a promise which resolves to a JSON of the requests for course details.
 
+//This maps available item names to the functions that are meant to grab the information. Will be implemented in the future.
+let whatIsAvailable = {
+    "assignments": "",
+    "documents":"",
+    "lectures":"",
+    "announcements":"",
+}
+
 // Everything dynamically loaded can be accessed with this helper function. Returns a promise.
+// Onload works as well through document.onload, but it's too 
 function grabWhenLoaded(url, targetSelector, loadedSelector){
     var newFrame = document.createElement("iframe");
     newFrame.src = url;
     document.body.appendChild(newFrame);
     return new Promise((resolve, reject) => {
+        let maxIterations = 0;
         var checkLoaded = setInterval(()=>{
-            if (newFrame.contentWindow.document.body.querySelector(loadedSelector)){
-                // Determine if number of elements is the same as with targetSelector
-                if (newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length > 0
-                    && newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length === newFrame.contentWindow.document.body.querySelectorAll(targetSelector).length){
-                    clearInterval(checkLoaded);
-                    console.log("Loaded:")
-                    console.log(newFrame.contentWindow.document.body.querySelectorAll(loadedSelector));
-                    console.log("Target:")
-                    console.log(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));
-                    //Probably should remove iframe here.
-                    resolve(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));    
+            maxIterations++;
+            try{
+                if (newFrame.contentWindow.document.body.querySelector(loadedSelector)){
+                    console.log("loop2");
+                    // Determine if number of elements is the same as with targetSelector
+                    if (newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length > 0
+                        && newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length === newFrame.contentWindow.document.body.querySelectorAll(targetSelector).length){
+                        clearInterval(checkLoaded);
+                        console.log("Loaded:")
+                        console.log(newFrame.contentWindow.document.body.querySelectorAll(loadedSelector));
+                        console.log("Target:")
+                        console.log(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));
+                        //Probably should remove iframe here.
+                        resolve(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));    
+                    }
                 }
             }
+            catch(e){
+
+            }
+            if (maxIterations > 20){
+                console.log("timed out");
+                clearInterval(checkLoaded);
+                reject();
+            }
         }, 1000)
+    })
+}
+
+//Should create a function here that works with onload instead, to deal with certain elements.
+//Generally the above function is slightly faster and actually works in more cases, but this one is cleaner.
+function grabWhenAllLoaded(url, targetSelector){
+    var newFrame = document.createElement("iframe");
+    newFrame.src = url;
+    document.body.appendChild(newFrame);
+    return new Promise((resolve, reject) => {
+        newFrame.contentWindow.onload = () => {
+            console.log("window loaded");
+            console.log(newFrame.contentWindow.document.body.querySelector(targetSelector));
+            resolve(newFrame.contentWindow.document.body.querySelector(targetSelector));    
+        }
+        newFrame.contentWindow.document.onload = () => {
+            console.log("document loaded");
+            console.log(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));
+            resolve(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));    
+        }
     })
 }
 
@@ -78,7 +120,11 @@ function grabGrades(courseID){
                 pGradeList.push(pGrade);
             })
             resolve(pGradeList);
-        });    
+        })
+        .catch(()=>{
+            console.log("Timed out. Assume that no grades exist.");
+            reject();
+        })
     });
 }
 
@@ -97,8 +143,6 @@ function grabGrades(courseID){
 //     })
 // })
 
-// Check whether
-
 // Check which "items" the course has available. Lectures, Documents, etc.
 function whatisAvailable(courseID){
     let url = `https://blackboard.stonybrook.edu/webapps/blackboard/execute/announcement?method=search&context=course_entry&course_id=${courseID}`;
@@ -106,7 +150,9 @@ function whatisAvailable(courseID){
         grabWhenLoaded(url, "li[id^=paletteItem]>a>span", "li[id^=paletteItem]>a>span")
         .then((topicList)=>{
             let pTopicList = [];
-            topicList.forEach(d=>pTopicList.push(d.title));
+            topicList.forEach(d=>{
+                pTopicList.push(d.title)
+            });
             resolve(pTopicList);
         });    
     });
@@ -122,6 +168,30 @@ function grabAnnouncements(courseID){
 }
 
 // Grab the assignments
+function grabAssignments(courseID){
+    let url = `https://blackboard.stonybrook.edu/webapps/blackboard/content/listContent.jsp?course_id=_1205805_1&content_id=_5186605_1&mode=reset`;
+    grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3")
+    .then((assignmentList) => {
+        let pAssList = [];
+        assignmentList.forEach(assignment => {
+            let pAss = {};
+            pAss.title = assignment.querySelector("span[style]").textContent;
+            pAss.description = assignment.querySelector(".vtbegenerated").textContent;
+            pAss.attachments = []
+            console.log(pAss);
+            assignment.querySelectorAll(".attachments").forEach((attachment)=>{
+                pAtt = {};
+                pAtt.link = attachment.querySelector("a").href;
+                pAtt.text = attachment.querySelector("a").textContent;
+                console.log(pAtt);
+                pAss.attachments.push(pAtt);
+            });
+            pAssList.push(pAss);
+        });
+        console.log(pAssList);
+    });
+}
 
+`https://blackboard.stonybrook.edu/webapps/blackboard/content/listContent.jsp?course_id=_1205805_1&content_id=${courseID}&mode=reset`
 
 // Grab the documents.

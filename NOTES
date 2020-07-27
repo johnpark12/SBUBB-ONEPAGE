@@ -4,3 +4,7 @@ Other issue is that the element loading is dynamic, so I'm going to have to set 
 
 MUST be a background page in order to be consistent.
 Must also redirect in the background to be able to load everything and collect all the info.
+
+Seperate clickable fallback element that they can use if they want to access the page directly. To this end, every grab should also return a link.
+Perhaps a tooltip or something that tells them exactly what they're doing.
+
