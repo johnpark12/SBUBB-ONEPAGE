@@ -48,7 +48,6 @@ window.onload = () => {
             item.id = pCourse.id;
             item.classList.add("course")
             item.appendChild(document.createTextNode(pCourse.title));
-            // Nesting another <ul> so that attributes can be added in onclick.
             item.onclick = showAvailable;
             document.querySelector(".courseListView").appendChild(item)
         }
@@ -68,7 +67,7 @@ function showGrades(){
 // We can already access resources directly, so it would be far, far better to just show a placeholder then check to see if those resources exist.
 function showAvailable(e){
     let courseID = e.target.id;
-    console.log(e.target);
+    //Changing style
     document.querySelectorAll(".course").forEach(d=>{
         if(d===e.target){
             d.classList.add("active")
@@ -77,25 +76,23 @@ function showAvailable(e){
             d.classList.remove("active")
         }
     });
-    for (let avail in whatIsAvailable){
+    //Clear out existing available list
+    document.querySelector(".availableView").innerHTML = "";
 
+    for (let avail in whatIsAvailable){
+        let item = document.createElement("li");
+        item.id = courseID;
+        item.classList.add("available")
+        item.appendChild(document.createTextNode(avail));
+        item.onclick = clicked;
+        document.querySelector(".availableView").appendChild(item)
     }
-    whatisAvailable(courseID)
-    .then((d)=>{
-        for (let contentTitle of d){
-            let item = document.createElement("li");
-            item.id = courseID;
-            item.appendChild(document.createTextNode(contentTitle));
-            item.onclick = () => {console.log("to be implemented")}
-            document.querySelector(".availableView").appendChild(item)
-        }
-    })
 }
 
 // General purpose function to generate part of the interface for the most common interaction - clicking and getting a list.
 let clicked = (e) => {
     let courseID = e.target.id;
-    document.querySelectorAll(".course").forEach(d=>{
+    document.querySelectorAll(".available").forEach(d=>{
         if(d===e.target){
             d.classList.add("active")
         }
@@ -103,15 +100,28 @@ let clicked = (e) => {
             d.classList.remove("active")
         }
     });
-    whatisAvailable(courseID)
-    .then((d)=>{
-        // First must check if grades exist.
-        for (let contentTitle of d){
+    let selected = whatIsAvailable[e.target.textContent];
+    selected(courseID)
+    .then(parsedList=>{
+        console.log(parsedList)
+        for (let parsed of parsedList){
+            console.log(parsed)
             let item = document.createElement("li");
-            item.id = courseID;
-            item.appendChild(document.createTextNode(contentTitle));
-            item.onclick = () => {console.log("to be implemented")}
-            document.querySelector(".availableView").appendChild(item)
+            item.classList.add("parsed")
+            //Link
+            let link = document.createElement("a");
+            link.href = parsed.link;
+            item.appendChild(link);
+            //Title
+            let title = document.createElement("h3");
+            title.appendChild(document.createTextNode(parsed.title))
+            link.appendChild(title)
+            // Description
+            let description = document.createElement("p");
+            description.appendChild(document.createTextNode(parsed.description))
+            link.appendChild(description)
+
+            document.querySelector(".detailsView").appendChild(item)
         }
     })
 }

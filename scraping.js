@@ -3,10 +3,10 @@
 
 //This maps available item names to the functions that are meant to grab the information. Will be implemented in the future.
 let whatIsAvailable = {
-    "assignments": "",
-    "documents":"",
-    "lectures":"",
-    "announcements":"",
+    "Assignments": grabAssignments,
+    "Documents":"",
+    "Lectures":"",
+    "Announcements":"",
 }
 
 // Everything dynamically loaded can be accessed with this helper function. Returns a promise.
@@ -21,7 +21,6 @@ function grabWhenLoaded(url, targetSelector, loadedSelector){
             maxIterations++;
             try{
                 if (newFrame.contentWindow.document.body.querySelector(loadedSelector)){
-                    console.log("loop2");
                     // Determine if number of elements is the same as with targetSelector
                     if (newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length > 0
                         && newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length === newFrame.contentWindow.document.body.querySelectorAll(targetSelector).length){
@@ -36,7 +35,6 @@ function grabWhenLoaded(url, targetSelector, loadedSelector){
                 }
             }
             catch(e){
-
             }
             if (maxIterations > 20){
                 console.log("timed out");
@@ -67,7 +65,7 @@ function grabWhenAllLoaded(url, targetSelector){
     })
 }
 
-// Grab the courses and their IDs
+// Grab the courses and their IDs. Parse the information.
 // Assuming that this function is run on the blackboard homepage.
 function courseAndGrades(){
     return new Promise((resolve, reject) =>{
@@ -170,28 +168,27 @@ function grabAnnouncements(courseID){
 // Grab the assignments
 function grabAssignments(courseID){
     let url = `https://blackboard.stonybrook.edu/webapps/blackboard/content/listContent.jsp?course_id=_1205805_1&content_id=_5186605_1&mode=reset`;
-    grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3")
-    .then((assignmentList) => {
-        let pAssList = [];
-        assignmentList.forEach(assignment => {
-            let pAss = {};
-            pAss.title = assignment.querySelector("span[style]").textContent;
-            pAss.description = assignment.querySelector(".vtbegenerated").textContent;
-            pAss.attachments = []
-            console.log(pAss);
-            assignment.querySelectorAll(".attachments").forEach((attachment)=>{
-                pAtt = {};
-                pAtt.link = attachment.querySelector("a").href;
-                pAtt.text = attachment.querySelector("a").textContent;
-                console.log(pAtt);
-                pAss.attachments.push(pAtt);
+    return new Promise((resolve, reject)=>{
+        grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3")
+        .then((assignmentList) => {
+            let pAssList = [];
+            assignmentList.forEach(assignment => {
+                let pAss = {};
+                pAss.title = assignment.querySelector("span[style]").textContent;
+                pAss.description = assignment.querySelector(".vtbegenerated").textContent;
+                pAss.attachments = []
+                // Since this is going to be presented as HTML anyway, might as well just have an array of processed HTML
+                assignment.querySelectorAll(".attachments").forEach((attachment)=>{
+                    pAtt = {};
+                    pAtt.link = attachment.querySelector("a").href;
+                    pAtt.text = attachment.querySelector("a").textContent;
+                    pAss.attachments.push(pAtt);
+                });
+                pAssList.push(pAss);
             });
-            pAssList.push(pAss);
+            resolve(pAssList);
         });
-        console.log(pAssList);
     });
 }
-
-`https://blackboard.stonybrook.edu/webapps/blackboard/content/listContent.jsp?course_id=_1205805_1&content_id=${courseID}&mode=reset`
 
 // Grab the documents.
