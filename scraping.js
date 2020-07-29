@@ -1,13 +1,19 @@
+// Only very basic caching established. Future development would include async development of data.
+courseCache = {};
+
 // Must update all the functions to work with single courses. So that they can be used as part of an "onclick" in the genSummary.js
 // All functions should return a promise which resolves to a JSON of the requests for course details.
 
 //This maps available item names to the functions that are meant to grab the information. Will be implemented in the future.
 let canProcess = {
-    "Assignments": grabAssignments,
-    "Documents": "",
-    "Lectures": "",
-    "Announcements": grabAnnouncements,
     "Grades": grabGrades,
+    "Announcements": grabAnnouncementsLoad,
+    "Syllabus": "",
+    "Documents": "",
+    "Lecture Notes": "",
+    "Assignments": grabAssignments,
+    "Review": "",
+    "Solutions": "",
 }
 
 // Everything dynamically loaded can be accessed with this helper function. Returns a promise.
@@ -38,8 +44,10 @@ function grabWhenLoaded(url, targetSelector, loadedSelector, isEmpty = () => fal
                             console.log("Target:")
                             console.log(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));
                             //Now that we're done, removing frame.
-                            document.removeChild(document.getElementById(frameID));
-                            resolve(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));    
+                            // document.removeChild(document.getElementById(frameID));
+                            resolve({
+                                "body": newFrame.contentWindow.document.body,
+                                "target":newFrame.contentWindow.document.body.querySelectorAll(targetSelector)});    
                         }
                     }, 1000);
                 }
@@ -51,7 +59,7 @@ function grabWhenLoaded(url, targetSelector, loadedSelector, isEmpty = () => fal
                 clearInterval(checkLoaded);
                 reject("timeout");
             }
-        }, 1000)
+        }, 2000)
     })
 }
 
@@ -112,6 +120,13 @@ function courseAndGrades(){
 
                         parsedCourse["id"] = course.querySelector("a").href.match(/id=(.*)&url/)[1];
                         parsedCourseList.push(parsedCourse);
+
+                        // Pushing into the cache.
+                        let courseKey = parsedCourse["id"]
+                        courseCache[courseKey] = {}
+                        courseCache[courseKey]["courseNumber"] = parsedCourse["courseNumber"]
+                        courseCache[courseKey]["courseTitle"] = parsedCourse["courseTitle"]
+                        courseCache[courseKey]["courseDate"] = parsedCourse["courseDate"]
                     }
                     resolve(parsedCourseList);
                 }
@@ -128,9 +143,9 @@ function grabGrades(courseID){
             return body.querySelectorAll(".calculatedRow")[body.querySelectorAll(".calculatedRow").length-2].querySelector(".grade").textContent.strip() === "-";
         }
         grabWhenLoaded(url, ".graded_item_row", ".graded_item_row span.grade", checkEmpty)
-        .then((gradeList)=>{
+        .then(({target})=>{
             let pGradeList = [];
-            gradeList.forEach((grade)=>{
+            target.forEach((grade)=>{
                 let pGrade = {};
                 pGrade["gradedItem"] = grade.querySelector("div.cell.gradable > a").textContent;
                 pGrade["gotScore"] = grade.querySelector("span.grade").textContent;
@@ -166,9 +181,10 @@ function whatisAvailable(courseID){
     let url = `https://blackboard.stonybrook.edu/webapps/blackboard/execute/announcement?method=search&context=course_entry&course_id=${courseID}`;
     return new Promise((resolve, reject)=>{
         grabWhenLoaded(url, "li[id^=paletteItem]>a", "li[id^=paletteItem]>a")
-        .then((topicList)=>{
+        .then(({body, target})=>{
+            // grabAnnouncementsFromPage(courseID, body);
             let pTopicList = [];
-            topicList.forEach(d=>{
+            target.forEach(d=>{
                 pTopic = {};
                 pTopic["title"] = d.textContent;
                 pTopic["link"] = d.href;
@@ -180,38 +196,61 @@ function whatisAvailable(courseID){
 }
 
 // Grab the Announcements. Since the Announcements are loaded upon loading the course homepage, we can just scrape it from there.
-function grabAnnouncementsFromPage(body){
-    // Check if empty
-    if (body.querySelectorAll(".noItems").length > 0){
-        return "none";
-    }
+// But this is a bit tricky, because it requires work on top of extracting target selector.
+function grabAnnouncementsFromPage(courseID, body){
     let pAnnouncementList = [];
-    body.querySelectorAll(".announcementList .clearfix").forEach(announcement=>{
-        let pAnnounce = {};
-        
-    });
-    return pAnnouncementList;
+    // Check if empty
+    if (body.querySelectorAll(".noItems").length == 0){
+        body.querySelectorAll(".announcementList .clearfix").forEach(announcement=>{
+            let pAnnounce = {};
+            pAnnounce.title = announcement.querySelector("h3").textContent.strip();
+            pAnnounce.date = announcement.querySelector(".details span").textContent
+            pAnnounce.description = announcement.querySelector(".vtbegenerated")
+            pAnnouncementList.push(pAnnounce);
+        });    
+    }
+    console.log(pAnnouncementList);
+    courseCache[courseID]["Announcements"] = pAnnouncementList;
+    // return pAnnouncementList;
 }
 
 //Secondary Announcements function
-function grabAnnouncementsLoad(courseID){
-    let url = `https://blackboard.stonybrook.edu/webapps/blackboard/execute/announcement?method=search&context=course_entry&course_id=${courseID}&handle=announcements_entry&mode=view`
-    grabWhenLoaded(url, "ul.announcementList>li", "div.details > div")
-    .then((announcementList) => {
-        console.log(announcementList);
-    });
+function grabAnnouncementsLoad(courseID, url){
+    return new Promise((resolve, reject)=>{
+        grabWhenLoaded(url, "ul.announcementList>li", "div.details > div", (body)=>body.querySelectorAll(".noItems").length > 0)
+        .then(({target}) => {
+            let pAnnouncementList = [];
+            target.forEach(announcement=>{
+                let pAnnounce = {};
+                pAnnounce.title = announcement.querySelector("h3").textContent;
+                console.log(pAnnounce.title)
+                pAnnounce.date = announcement.querySelector(".details span").textContent
+                //Want to preserve only the linebreaks from description. Everything else is extraneous.
+                pAnnounce.description = []
+                announcement.querySelectorAll(".vtbegenerated p").forEach(line => {
+                    pAnnounce.description.push(line.textContent)
+                })
+                pAnnouncementList.push(pAnnounce);
+            });    
+            resolve(pAnnouncementList)
+        });    
+    })
 }
 
 // Grab the assignments
 function grabAssignments (courseID, url){
-    console.log(url);
     return new Promise((resolve, reject)=>{
         grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3")
-        .then((assignmentList) => {
+        .then(({target}) => {
             let pAssList = [];
-            assignmentList.forEach(assignment => {
+            target.forEach(assignment => {
                 let pAss = {};
                 pAss.title = assignment.querySelector("span[style]").textContent;
+                //Want to preserve only the linebreaks from description. Everything else is extraneous.
+                pAss.description = []
+                assignment.querySelectorAll(".vtbegenerated p").forEach(line => {
+                    pAss.description.push(line.textContent)
+                })
                 pAss.description = assignment.querySelector(".vtbegenerated").textContent;
                 pAss.attachments = []
                 // Since this is going to be presented as HTML anyway, might as well just have an array of processed HTML
@@ -225,10 +264,36 @@ function grabAssignments (courseID, url){
             });
             resolve(pAssList);
         })
-        // .catch(cond=>{
-        //     reject();
-        // })
     });
 }
 
 // Grab the documents.
+
+function grabAssignments (courseID, url){
+    return new Promise((resolve, reject)=>{
+        grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3")
+        .then(({target}) => {
+            let pAssList = [];
+            target.forEach(assignment => {
+                let pAss = {};
+                pAss.title = assignment.querySelector("span[style]").textContent;
+                //Want to preserve only the linebreaks from description. Everything else is extraneous.
+                pAss.description = []
+                assignment.querySelectorAll(".vtbegenerated p").forEach(line => {
+                    pAss.description.push(line.textContent)
+                })
+                pAss.description = assignment.querySelector(".vtbegenerated").textContent;
+                pAss.attachments = []
+                // Since this is going to be presented as HTML anyway, might as well just have an array of processed HTML
+                assignment.querySelectorAll(".attachments").forEach((attachment)=>{
+                    pAtt = {};
+                    pAtt.link = attachment.querySelector("a").href;
+                    pAtt.text = attachment.querySelector("a").textContent;
+                    pAss.attachments.push(pAtt);
+                });
+                pAssList.push(pAss);
+            });
+            resolve(pAssList);
+        })
+    });
+}

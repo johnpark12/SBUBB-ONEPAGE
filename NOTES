@@ -11,3 +11,10 @@ Perhaps a tooltip or something that tells them exactly what they're doing.
 I want to create the effect of an element sliding out from under another element.
 
 Pre-scrape as many links as possible to reduce load time for links.
+
+Should let you
+
+When caching, I'll have to initialize it with a promise so that when you're looking for something, you return either the completed object or the promise.
+So actually, the onclick functions should eventually not start it but look into the cache.
+
+The killer feature has to be that I can let people just leave it on in the background and the extension will not just keep all info up to date, but notify if anything new comes up.

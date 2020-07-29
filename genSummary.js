@@ -1,6 +1,3 @@
-// Implementing a caching system. For now, all this stores is a KV of KVs regarding courseIDs.
-courseCache = {}
-
 // After some thought, I think that the best approach is to make everything "onclick", because otherwise we run into issues with rate limiting.
 // Since we're segmenting the sections out, this section should only contain scripts to build out the page based on JSON returned from scraping.js.
 window.onload = () => {
@@ -44,13 +41,8 @@ window.onload = () => {
     courseAndGrades()
     .then(pCourseList=>{
         //Experiment with deloading
-        document.body.innerHTML = "";
-        document.body.appendChild(background);
-
-        // Initializing the courseCache
-        for (let pCourse of pCourseList){
-            courseCache[pCourse.id] = {}
-        }
+        // document.body.innerHTML = "";
+        // document.body.appendChild(background);
         //Sorting courses according to date.
         let {courseGroup, courseOrder} = sortCourseDates(pCourseList);
         for (let pCourseKey of courseOrder){
@@ -64,8 +56,7 @@ window.onload = () => {
                 let item = document.createElement("li");
                 item.id = course.id;
                 item.classList.add("course")
-                item.appendChild(document.createTextNode(course.courseNumber));
-                item.appendChild(document.createTextNode(course.courseTitle));
+                item.appendChild(document.createTextNode(course.courseNumber + " - " + course.courseTitle));
                 item.onclick = showAvailable;
                 semCourses.appendChild(item);
             }
@@ -153,10 +144,15 @@ let showAvailable = (e) => {
     // }
     whatisAvailable(courseID)
     .then(availableList => {
+        console.log(availableList)
         // Loading everything into the cache.
         for (let avail of availableList){
-            courseCache[courseID][avail.title] = avail.link;
+            courseCache[courseID][avail.title + "Link"] = avail.link;
         }
+        // Header for availableView column
+        let aHeader = document.createElement("h3")
+        aHeader.appendChild(document.createTextNode("Menu Items"))
+        document.querySelector(".availableView").appendChild(aHeader)
         //Creating list of available
         for (let avail of availableList){
             if (avail.title in canProcess){
@@ -182,32 +178,60 @@ let clicked = (e) => {
             d.classList.remove("active")
         }
     });
-    let selected = canProcess[linkTitle];
-    console.log(linkTitle)
-    console.log(courseID)
-    selected(courseID, courseCache[courseID][linkTitle])
-    .then(parsedList=>{
-        console.log(parsedList)
-        for (let parsed of parsedList){
-            console.log(parsed)
+    // Check cache first.
+    console.log(courseCache);
+    if (linkTitle in courseCache[courseID]){
+        let content = courseCache[courseID][linkTitle]
+        console.log(content);
+        for (let parsed of content){
             let item = document.createElement("li");
             item.classList.add("parsed")
             //Link
             let link = document.createElement("a");
-            link.href = parsed.link;
+            link.href = parsed.link? parsed.link: "#";
             item.appendChild(link);
             //Title
             let title = document.createElement("h3");
             title.appendChild(document.createTextNode(parsed.title))
             link.appendChild(title)
             // Description
-            let description = document.createElement("p");
-            description.appendChild(document.createTextNode(parsed.description))
-            link.appendChild(description)
+            // let description = document.createElement("p");
+            // description.appendChild(document.createTextNode(parsed.description))
+            link.appendChild(parsed.description)
 
             document.querySelector(".detailsView").appendChild(item)
         }
-    })
+    }
+    else{
+        let selected = canProcess[linkTitle];
+        console.log(linkTitle)
+        console.log(courseID)
+        selected(courseID, courseCache[courseID][linkTitle + "Link"])
+        .then(parsedList=>{
+            console.log(parsedList)
+            for (let parsed of parsedList){
+                console.log(parsed)
+                let item = document.createElement("li");
+                item.classList.add("parsed")
+                //Link TODO
+                // let link = document.createElement("a");
+                // link.href = parsed.link;
+                // item.appendChild(link);
+                //Title
+                let title = document.createElement("h3");
+                title.appendChild(document.createTextNode(parsed.title))
+                item.appendChild(title)
+                // Description
+                parsed.description.forEach(line=>{
+                    item.appendChild(document.createTextNode(line))
+                })
+                // let description = document.createElement("p");
+                // description.appendChild()
+    
+                document.querySelector(".detailsView").appendChild(item)
+            }
+        })
+    }
 }
 
 //Creating a listener to make itself visible.
