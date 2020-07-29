@@ -2,44 +2,54 @@
 // All functions should return a promise which resolves to a JSON of the requests for course details.
 
 //This maps available item names to the functions that are meant to grab the information. Will be implemented in the future.
-let whatIsAvailable = {
+let canProcess = {
     "Assignments": grabAssignments,
-    "Documents":"",
-    "Lectures":"",
-    "Announcements":"",
+    "Documents": "",
+    "Lectures": "",
+    "Announcements": grabAnnouncements,
+    "Grades": grabGrades,
 }
 
 // Everything dynamically loaded can be accessed with this helper function. Returns a promise.
-// Onload works as well through document.onload, but it's too 
-function grabWhenLoaded(url, targetSelector, loadedSelector){
+// TODO: Add an additional function argument that makes sure that 
+function grabWhenLoaded(url, targetSelector, loadedSelector, isEmpty = () => false){
     var newFrame = document.createElement("iframe");
     newFrame.src = url;
+    let frameID = Math.floor(Math.random() * 1000000000)
+    newFrame.id = frameID;
     document.body.appendChild(newFrame);
     return new Promise((resolve, reject) => {
         let maxIterations = 0;
         var checkLoaded = setInterval(()=>{
             maxIterations++;
             try{
+                // FCF to "flag" if no parsable data is available.
+                if (isEmpty(newFrame.contentWindow.document.body)){
+                    reject("none");
+                }
                 if (newFrame.contentWindow.document.body.querySelector(loadedSelector)){
-                    // Determine if number of elements is the same as with targetSelector
-                    if (newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length > 0
+                    setTimeout(function(){ 
+                        // Determine if number of elements is the same as with targetSelector
+                        if (newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length > 0
                         && newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length === newFrame.contentWindow.document.body.querySelectorAll(targetSelector).length){
-                        clearInterval(checkLoaded);
-                        console.log("Loaded:")
-                        console.log(newFrame.contentWindow.document.body.querySelectorAll(loadedSelector));
-                        console.log("Target:")
-                        console.log(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));
-                        //Probably should remove iframe here.
-                        resolve(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));    
-                    }
+                            clearInterval(checkLoaded);
+                            console.log("Loaded:")
+                            console.log(newFrame.contentWindow.document.body.querySelectorAll(loadedSelector));
+                            console.log("Target:")
+                            console.log(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));
+                            //Now that we're done, removing frame.
+                            document.removeChild(document.getElementById(frameID));
+                            resolve(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));    
+                        }
+                    }, 1000);
                 }
             }
             catch(e){
             }
-            if (maxIterations > 20){
+            if (maxIterations > 60){
                 console.log("timed out");
                 clearInterval(checkLoaded);
-                reject();
+                reject("timeout");
             }
         }, 1000)
     })
@@ -83,16 +93,23 @@ function courseAndGrades(){
                         let title = course.querySelector("a").textContent;
                         if (title[0] == "/"){
                             parsedCourse["status"] = "pending";
-                            parsedCourse["title"] = title.slice(1,);
+                            title = title.slice(1,);
                         }
                         else if (title[0] == "."){
                             parsedCourse["status"] = "active";
-                            parsedCourse["title"] = title.slice(1,);
+                            title = title.slice(1,);
                         }
                         else {
                             parsedCourse["status"] = "finished";
-                            parsedCourse["title"] = title;
+                            title = title;
                         }
+                        // Extracting date and course number
+                        courseNumberPattern = /[A-Za-z]* [0-9]{3}\.[RLT]*[0-9]{2}/g;
+                        parsedCourse["courseNumber"] = title.match(courseNumberPattern)[0];
+                        parsedCourse["courseTitle"] = title.match(/ [a-zA-Z].* -/g)[0].slice(1,-2)
+                        // parsedCourse["courseSemester"] = title.match(/ [a-zA-Z].* -/g)[0].slice(1,-2)
+                        parsedCourse["courseDate"] = title.match(/ [a-zA-Z]{3,6} [0-9]{4}/g)[0].slice(1,)
+
                         parsedCourse["id"] = course.querySelector("a").href.match(/id=(.*)&url/)[1];
                         parsedCourseList.push(parsedCourse);
                     }
@@ -107,7 +124,10 @@ function courseAndGrades(){
 function grabGrades(courseID){
     let url = `https://blackboard.stonybrook.edu/webapps/bb-mygrades-bb_bb60/myGrades?course_id=${courseID}&stream_name=mygrades`;
     return new Promise((resolve, reject)=>{
-        grabWhenLoaded(url, ".graded_item_row", ".graded_item_row span.grade")
+        let checkEmpty = (body) => {
+            return body.querySelectorAll(".calculatedRow")[body.querySelectorAll(".calculatedRow").length-2].querySelector(".grade").textContent.strip() === "-";
+        }
+        grabWhenLoaded(url, ".graded_item_row", ".graded_item_row span.grade", checkEmpty)
         .then((gradeList)=>{
             let pGradeList = [];
             gradeList.forEach((grade)=>{
@@ -145,19 +165,36 @@ function grabGrades(courseID){
 function whatisAvailable(courseID){
     let url = `https://blackboard.stonybrook.edu/webapps/blackboard/execute/announcement?method=search&context=course_entry&course_id=${courseID}`;
     return new Promise((resolve, reject)=>{
-        grabWhenLoaded(url, "li[id^=paletteItem]>a>span", "li[id^=paletteItem]>a>span")
+        grabWhenLoaded(url, "li[id^=paletteItem]>a", "li[id^=paletteItem]>a")
         .then((topicList)=>{
             let pTopicList = [];
             topicList.forEach(d=>{
-                pTopicList.push(d.title)
+                pTopic = {};
+                pTopic["title"] = d.textContent;
+                pTopic["link"] = d.href;
+                pTopicList.push(pTopic)
             });
             resolve(pTopicList);
         });    
     });
 }
 
-// Grab the Announcements
-function grabAnnouncements(courseID){
+// Grab the Announcements. Since the Announcements are loaded upon loading the course homepage, we can just scrape it from there.
+function grabAnnouncementsFromPage(body){
+    // Check if empty
+    if (body.querySelectorAll(".noItems").length > 0){
+        return "none";
+    }
+    let pAnnouncementList = [];
+    body.querySelectorAll(".announcementList .clearfix").forEach(announcement=>{
+        let pAnnounce = {};
+        
+    });
+    return pAnnouncementList;
+}
+
+//Secondary Announcements function
+function grabAnnouncementsLoad(courseID){
     let url = `https://blackboard.stonybrook.edu/webapps/blackboard/execute/announcement?method=search&context=course_entry&course_id=${courseID}&handle=announcements_entry&mode=view`
     grabWhenLoaded(url, "ul.announcementList>li", "div.details > div")
     .then((announcementList) => {
@@ -166,8 +203,8 @@ function grabAnnouncements(courseID){
 }
 
 // Grab the assignments
-function grabAssignments(courseID){
-    let url = `https://blackboard.stonybrook.edu/webapps/blackboard/content/listContent.jsp?course_id=_1205805_1&content_id=_5186605_1&mode=reset`;
+function grabAssignments (courseID, url){
+    console.log(url);
     return new Promise((resolve, reject)=>{
         grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3")
         .then((assignmentList) => {
@@ -187,7 +224,10 @@ function grabAssignments(courseID){
                 pAssList.push(pAss);
             });
             resolve(pAssList);
-        });
+        })
+        // .catch(cond=>{
+        //     reject();
+        // })
     });
 }
 

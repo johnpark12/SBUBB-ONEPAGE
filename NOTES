@@ -9,3 +9,5 @@ Seperate clickable fallback element that they can use if they want to access the
 Perhaps a tooltip or something that tells them exactly what they're doing.
 
 I want to create the effect of an element sliding out from under another element.
+
+Pre-scrape as many links as possible to reduce load time for links.
