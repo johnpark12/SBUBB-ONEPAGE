@@ -1,3 +1,7 @@
+CRITICAL ISSUES:
+Must remove iframes after loading.
+Consolidate scrapers.
+
 So the way that app functions is by having a content script scrape and format all the relevent data which is then sent to the background page?
 Or should the scraping automatically add to the injected html?
 Other issue is that the element loading is dynamic, so I'm going to have to set onload triggers to make sure data is only scraped when relevent elements are loaded.
@@ -18,3 +22,27 @@ When caching, I'll have to initialize it with a promise so that when you're look
 So actually, the onclick functions should eventually not start it but look into the cache.
 
 The killer feature has to be that I can let people just leave it on in the background and the extension will not just keep all info up to date, but notify if anything new comes up.
+Perhaps a small indicator on each item to show that it's been loaded.
+
+Option to launch summary screen by default when loading blackboard. Perhaps I could collect data on how many people choose this interface over blackboard.
+
+Possible to change so that it's as if each column creates the subsequent column.
+But doing so would require significant refactoring. Perhaps at a future date.
+.... Actually, after some more thought, I think that it should be refactored. It would make far more sense than the current architecture.
+It makes sense for the first column to be treated differently, but not subsequent columns.
+
+After some use, I've determined that loading time is generally fast enough to be acceptable.
+
+Better handling of timeouts required.
+
+Using QSAll where possible because it makes it easier to handle cases.
+
+Spiffier caching possible by tracking "paths" of links. 
+
+I wonder whether it's possible to do this navigation from inside an iframe.
+To improve load times.
+
+I think what's happening is that the interval is being cleared for the next grabloaded.
+Must sync this properly.
+
+There's something strange with the way that querySelector works vs QSAll.

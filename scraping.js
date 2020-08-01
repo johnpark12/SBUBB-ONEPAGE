@@ -8,53 +8,57 @@ courseCache = {};
 let canProcess = {
     "Grades": grabGrades,
     "Announcements": grabAnnouncementsLoad,
-    "Syllabus": "",
-    "Documents": "",
-    "Lecture Notes": "",
+    "Syllabus": grabGeneral,
+    "Documents": grabGeneral,
+    "Lecture Notes": grabGeneral,
     "Assignments": grabAssignments,
-    "Review": "",
-    "Solutions": "",
+    "Review": grabGeneral,
+    "Solutions": grabGeneral,
 }
 
 // Everything dynamically loaded can be accessed with this helper function. Returns a promise.
-// TODO: Add an additional function argument that makes sure that 
 function grabWhenLoaded(url, targetSelector, loadedSelector, isEmpty = () => false){
     var newFrame = document.createElement("iframe");
     newFrame.src = url;
-    let frameID = Math.floor(Math.random() * 1000000000)
+    let frameID = "a" + Math.floor(Math.random() * 1000000000) //The 'a' is arbitrary
     newFrame.id = frameID;
     document.body.appendChild(newFrame);
     return new Promise((resolve, reject) => {
         let maxIterations = 0;
         var checkLoaded = setInterval(()=>{
+            console.log("outer loop")
             maxIterations++;
-            try{
-                // FCF to "flag" if no parsable data is available.
-                if (isEmpty(newFrame.contentWindow.document.body)){
-                    reject("none");
-                }
-                if (newFrame.contentWindow.document.body.querySelector(loadedSelector)){
-                    setTimeout(function(){ 
-                        // Determine if number of elements is the same as with targetSelector
-                        if (newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length > 0
-                        && newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length === newFrame.contentWindow.document.body.querySelectorAll(targetSelector).length){
-                            clearInterval(checkLoaded);
-                            console.log("Loaded:")
-                            console.log(newFrame.contentWindow.document.body.querySelectorAll(loadedSelector));
-                            console.log("Target:")
-                            console.log(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));
-                            //Now that we're done, removing frame.
-                            // document.removeChild(document.getElementById(frameID));
-                            resolve({
-                                "body": newFrame.contentWindow.document.body,
-                                "target":newFrame.contentWindow.document.body.querySelectorAll(targetSelector)});    
-                        }
-                    }, 1000);
-                }
+            // FCF to "flag" if no parsable data is available.
+            if (isEmpty(newFrame.contentWindow.document.body)){
+                reject("none");
             }
-            catch(e){
+            if (newFrame.contentWindow.document.body.querySelector(loadedSelector)){
+            // if (document.getElementById(frameID).contentWindow.document.body.querySelectorAll(loadedSelector) > 0){
+                // clearInterval(checkLoaded);
+                // var checkAllLoaded = setInterval(function(){ 
+                setTimeout(function(){ 
+                    console.log("inner loop")
+                    // Determine if number of elements is the same as with targetSelector
+                    if (newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length > 0
+                    && newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length === newFrame.contentWindow.document.body.querySelectorAll(targetSelector).length){
+                        console.log("Loaded:")
+                        console.log(newFrame.contentWindow.document.body.querySelectorAll(loadedSelector));
+                        console.log("Target:")
+                        console.log(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));
+                        let frameBody = newFrame.contentWindow.document.body
+                        let frameTarget = newFrame.contentWindow.document.body.querySelectorAll(targetSelector)
+                        // clearInterval(checkAllLoaded);
+                        clearInterval(checkLoaded);
+                        //Now that we're done, removing frame.
+                        document.body.removeChild(document.getElementById(frameID));
+                        resolve({
+                            "body": frameBody,
+                            "target": frameTarget
+                        });    
+                    }
+                }, 1000);
             }
-            if (maxIterations > 60){
+            if (maxIterations > 120){
                 console.log("timed out");
                 clearInterval(checkLoaded);
                 reject("timeout");
@@ -62,6 +66,11 @@ function grabWhenLoaded(url, targetSelector, loadedSelector, isEmpty = () => fal
         }, 2000)
     })
 }
+
+// Yet another scraper - this one works through navigation.
+// It compares the link that it must go to with the location that the iframe is currently on.
+// The process can be split into two - Navigation then loading.
+// Would also require me to 
 
 //Should create a function here that works with onload instead, to deal with certain elements.
 //Generally the above function is slightly faster and actually works in more cases, but this one is cleaner.
@@ -117,6 +126,7 @@ function courseAndGrades(){
                         parsedCourse["courseTitle"] = title.match(/ [a-zA-Z].* -/g)[0].slice(1,-2)
                         // parsedCourse["courseSemester"] = title.match(/ [a-zA-Z].* -/g)[0].slice(1,-2)
                         parsedCourse["courseDate"] = title.match(/ [a-zA-Z]{3,6} [0-9]{4}/g)[0].slice(1,)
+                        parsedCourse["courseLink"] = course.querySelector("a").href;
 
                         parsedCourse["id"] = course.querySelector("a").href.match(/id=(.*)&url/)[1];
                         parsedCourseList.push(parsedCourse);
@@ -140,21 +150,29 @@ function grabGrades(courseID){
     let url = `https://blackboard.stonybrook.edu/webapps/bb-mygrades-bb_bb60/myGrades?course_id=${courseID}&stream_name=mygrades`;
     return new Promise((resolve, reject)=>{
         let checkEmpty = (body) => {
-            return body.querySelectorAll(".calculatedRow")[body.querySelectorAll(".calculatedRow").length-2].querySelector(".grade").textContent.strip() === "-";
+            // Find the total row
+            // let allCalculatedRows = Array.from(body.querySelectorAll(".calculatedRow"))
+            // let fRow = allCalculatedRows.filter(calcRow => calcRow.querySelector(".gradable").textContent.trim().split("\n")[0]
+            // let totalGrade = fRow.querySelector(".grade").textContent.trim();
+            // return totalGrade === "-";
+            return false;
         }
         grabWhenLoaded(url, ".graded_item_row", ".graded_item_row span.grade", checkEmpty)
         .then(({target})=>{
             let pGradeList = [];
             target.forEach((grade)=>{
                 let pGrade = {};
-                pGrade["gradedItem"] = grade.querySelector("div.cell.gradable > a").textContent;
+                pGrade["gradedItem"] = grade.querySelector("div.cell.gradable").textContent.trim().split("\n")[0];
+                pGrade["link"] = grade.querySelectorAll("a").length > 0? grade.querySelector("a").href: null
                 pGrade["gotScore"] = grade.querySelector("span.grade").textContent;
                 pGrade["maxScore"] = grade.querySelector("span.pointsPossible").textContent;
                 pGradeList.push(pGrade);
             })
+            console.log(pGradeList)
             resolve(pGradeList);
         })
-        .catch(()=>{
+        .catch((e)=>{
+            console.log(e);
             console.log("Timed out. Assume that no grades exist.");
             reject();
         })
@@ -238,20 +256,21 @@ function grabAnnouncementsLoad(courseID, url){
 }
 
 // Grab the assignments
+// TODO: Doesn't link to assignment submission properly.
 function grabAssignments (courseID, url){
     return new Promise((resolve, reject)=>{
-        grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3")
+        grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3", (body)=>body.querySelectorAll(".noItems").length > 0)
         .then(({target}) => {
             let pAssList = [];
             target.forEach(assignment => {
                 let pAss = {};
                 pAss.title = assignment.querySelector("span[style]").textContent;
+                pAss.link = assignment.querySelector("a").href;
                 //Want to preserve only the linebreaks from description. Everything else is extraneous.
                 pAss.description = []
                 assignment.querySelectorAll(".vtbegenerated p").forEach(line => {
                     pAss.description.push(line.textContent)
                 })
-                pAss.description = assignment.querySelector(".vtbegenerated").textContent;
                 pAss.attachments = []
                 // Since this is going to be presented as HTML anyway, might as well just have an array of processed HTML
                 assignment.querySelectorAll(".attachments").forEach((attachment)=>{
@@ -268,24 +287,22 @@ function grabAssignments (courseID, url){
 }
 
 // Grab the documents.
-
-function grabAssignments (courseID, url){
+function grabDocuments(courseID, url){
     return new Promise((resolve, reject)=>{
-        grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3")
+        grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3", (body)=>body.querySelectorAll(".noItems").length > 0)
         .then(({target}) => {
-            let pAssList = [];
-            target.forEach(assignment => {
-                let pAss = {};
-                pAss.title = assignment.querySelector("span[style]").textContent;
+            let pDocumentList = [];
+            target.forEach(document => {
+                let pDocument = {};
+                pDocument.title = document.querySelector("span[style]").textContent;
                 //Want to preserve only the linebreaks from description. Everything else is extraneous.
-                pAss.description = []
-                assignment.querySelectorAll(".vtbegenerated p").forEach(line => {
-                    pAss.description.push(line.textContent)
+                pDocument.description = []
+                document.querySelectorAll(".vtbegenerated p").forEach(line => {
+                    pDocument.description.push(line.textContent)
                 })
-                pAss.description = assignment.querySelector(".vtbegenerated").textContent;
-                pAss.attachments = []
+                pDocument.attachments = []
                 // Since this is going to be presented as HTML anyway, might as well just have an array of processed HTML
-                assignment.querySelectorAll(".attachments").forEach((attachment)=>{
+                document.querySelectorAll(".attachments").forEach((attachment)=>{
                     pAtt = {};
                     pAtt.link = attachment.querySelector("a").href;
                     pAtt.text = attachment.querySelector("a").textContent;
@@ -294,6 +311,36 @@ function grabAssignments (courseID, url){
                 pAssList.push(pAss);
             });
             resolve(pAssList);
+        })
+    });
+}
+
+
+// Grab the Syallabus.
+function grabGeneral(courseID, url){
+    return new Promise((resolve, reject)=>{
+        grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3", (body)=>body.querySelectorAll(".noItems").length > 0)
+        .then(({target}) => {
+            let pItemList = [];
+            target.forEach(item => {
+                let pItem = {};
+                pItem.title = item.querySelector("span[style]").textContent;
+                pItem.link = item.querySelector("a").href;
+                //Want to preserve only the linebreaks from description. Everything else is extraneous.
+                pItem.description = []
+                item.querySelectorAll(".vtbegenerated p").forEach(line => {
+                    pItem.description.push(line.textContent)
+                })
+                pItem.attachments = []
+                item.querySelectorAll(".attachments").forEach((attachment)=>{
+                    let pAtt = {};
+                    pAtt.link = attachment.querySelector("a").href;
+                    pAtt.text = attachment.querySelector("a").textContent;
+                    pItem.attachments.push(pAtt);
+                });
+                pItemList.push(pItem);
+            });
+            resolve(pItemList);
         })
     });
 }

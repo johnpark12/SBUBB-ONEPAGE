@@ -1,6 +1,6 @@
 // After some thought, I think that the best approach is to make everything "onclick", because otherwise we run into issues with rate limiting.
 // Since we're segmenting the sections out, this section should only contain scripts to build out the page based on JSON returned from scraping.js.
-window.onload = () => {
+// window.onload = () => {
     // Building the background
     let background = document.createElement("div");
     background.id = "mainContainer";
@@ -36,13 +36,16 @@ window.onload = () => {
     //Adding generated HTML to document.body
     document.body.appendChild(background);
 
+    document.querySelector(".courseListView").appendChild(loader())
 
     // Building out the course presentation
     courseAndGrades()
     .then(pCourseList=>{
         //Experiment with deloading
-        // document.body.innerHTML = "";
-        // document.body.appendChild(background);
+        document.body.innerHTML = "";
+        document.body.appendChild(background);
+        //Removing the loader
+        document.querySelector(".courseListView").innerHTML = ""
         //Sorting courses according to date.
         let {courseGroup, courseOrder} = sortCourseDates(pCourseList);
         for (let pCourseKey of courseOrder){
@@ -58,12 +61,18 @@ window.onload = () => {
                 item.classList.add("course")
                 item.appendChild(document.createTextNode(course.courseNumber + " - " + course.courseTitle));
                 item.onclick = showAvailable;
+                let extLink = document.createElement("a")
+                extLink.href = course["courseLink"];
+                let extLinkIcon = document.createElement("img")
+                extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
+                extLink.appendChild(extLinkIcon)
+                item.appendChild(extLink)
                 semCourses.appendChild(item);
             }
             document.querySelector(".courseListView").appendChild(itemSemester);
         }
     });
-} 
+// } 
 
 // These collection of functions is designed to build out the info bit by bit, dynamically.
 // I should possibly look to the old callback use of "next" as a model as to how to asynchronously build out the interface.
@@ -142,13 +151,37 @@ let showAvailable = (e) => {
     //     item.onclick = clicked;
     //     document.querySelector(".availableView").appendChild(item)
     // }
+
+    //Adding loader
+    document.querySelector(".availableView").appendChild(loader())
+
     whatisAvailable(courseID)
     .then(availableList => {
+        //Remove loader
+        document.querySelector(".availableView").innerHTML = ""
         console.log(availableList)
         // Loading everything into the cache.
         for (let avail of availableList){
             courseCache[courseID][avail.title + "Link"] = avail.link;
         }
+        // Adding Grade viewer (although not all courses will have grades)
+        let gHeader = document.createElement("h3")
+        gHeader.appendChild(document.createTextNode("View Grades"))
+        document.querySelector(".availableView").appendChild(gHeader)
+        let item = document.createElement("li");
+        item.classList.add("available")
+        item.appendChild(document.createTextNode("Grades"));
+        //Adding external link
+        let extLink = document.createElement("a")
+        extLink.href = `https://blackboard.stonybrook.edu/webapps/bb-mygrades-bb_bb60/myGrades?course_id=${courseID}&stream_name=mygrades`
+        let extLinkIcon = document.createElement("img")
+        extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
+        extLink.appendChild(extLinkIcon)
+        item.appendChild(extLink)
+
+        item.onclick = clicked;
+        document.querySelector(".availableView").appendChild(item)
+        
         // Header for availableView column
         let aHeader = document.createElement("h3")
         aHeader.appendChild(document.createTextNode("Menu Items"))
@@ -161,6 +194,13 @@ let showAvailable = (e) => {
                 item.appendChild(document.createTextNode(avail.title));
                 item.onclick = clicked;
                 document.querySelector(".availableView").appendChild(item)    
+                // Adding ext link
+                let extLink = document.createElement("a")
+                extLink.href = avail.link
+                let extLinkIcon = document.createElement("img")
+                extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
+                extLink.appendChild(extLinkIcon)
+                item.appendChild(extLink)
             }
         }
     })
@@ -168,6 +208,9 @@ let showAvailable = (e) => {
 
 // General purpose function to generate part of the interface for the most common interaction - clicking and getting a list.
 let clicked = (e) => {
+    //Clear details for new details
+    document.querySelector(".detailsView").innerHTML = ""
+
     let courseID = document.querySelector(".courseListView .active").id;
     let linkTitle = e.target.textContent;
     document.querySelectorAll(".available").forEach(d=>{
@@ -203,32 +246,68 @@ let clicked = (e) => {
         }
     }
     else{
+        //Placing loader
+        document.querySelector(".detailsView").appendChild(loader())
+
         let selected = canProcess[linkTitle];
         console.log(linkTitle)
         console.log(courseID)
         selected(courseID, courseCache[courseID][linkTitle + "Link"])
         .then(parsedList=>{
+            //Remove loader
+            document.querySelector(".detailsView").innerHTML = ""
+
             console.log(parsedList)
-            for (let parsed of parsedList){
-                console.log(parsed)
-                let item = document.createElement("li");
-                item.classList.add("parsed")
-                //Link TODO
-                // let link = document.createElement("a");
-                // link.href = parsed.link;
-                // item.appendChild(link);
-                //Title
-                let title = document.createElement("h3");
-                title.appendChild(document.createTextNode(parsed.title))
-                item.appendChild(title)
-                // Description
-                parsed.description.forEach(line=>{
-                    item.appendChild(document.createTextNode(line))
-                })
-                // let description = document.createElement("p");
-                // description.appendChild()
-    
-                document.querySelector(".detailsView").appendChild(item)
+            if (linkTitle === "Grades"){
+                for (let parsed of parsedList){
+                    let item = document.createElement("li");
+                    item.classList.add("parsed")
+                    //Title
+                    let title = document.createElement("h3");
+                    title.appendChild(document.createTextNode(parsed.gradedItem))
+                    item.appendChild(title)
+                    //Link
+                    if (parsed.link){
+                        let extLink = document.createElement("a")
+                        extLink.href = parsed.link
+                        let extLinkIcon = document.createElement("img")
+                        extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
+                        extLink.appendChild(extLinkIcon)
+                        item.appendChild(extLink)
+                    }
+                    // Grade View
+                    item.appendChild(document.createTextNode(parsed.gotScore))
+                    item.appendChild(document.createTextNode(parsed.maxScore))
+        
+                    document.querySelector(".detailsView").appendChild(item)
+                }
+            }
+            else{
+                for (let parsed of parsedList){
+                    console.log(parsed)
+                    let item = document.createElement("li");
+                    item.classList.add("parsed")
+                    //Title
+                    let title = document.createElement("h3");
+                    title.appendChild(document.createTextNode(parsed.title))
+                    item.appendChild(title)
+                    //Link
+                    let extLink = document.createElement("a")
+                    extLink.href = parsed.link
+                    let extLinkIcon = document.createElement("img")
+                    extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
+                    extLink.appendChild(extLinkIcon)
+                    item.appendChild(extLink)
+                    // TODO: Attachments
+                    // Description
+                    parsed.description.forEach(line=>{
+                        item.appendChild(document.createTextNode(line))
+                    })
+                    // let description = document.createElement("p");
+                    // description.appendChild()
+        
+                    document.querySelector(".detailsView").appendChild(item)
+                }   
             }
         })
     }
@@ -261,3 +340,20 @@ chrome.runtime.onMessage.addListener(
 //     document.body.appendChild(embeddedOpen);
 // });
 // observer.observe(document.getElementById("div_4_1"), {"childList": true});
+
+function loader(){
+    let spinnerContainer = document.createElement("div")
+    spinnerContainer.classList.add("spinnerContainer")
+    let spinner = document.createElement("div")
+    spinnerContainer.appendChild(spinner)
+    spinner.classList.add("lds-roller")
+    spinner.appendChild(document.createElement("div"))
+    spinner.appendChild(document.createElement("div"))
+    spinner.appendChild(document.createElement("div"))
+    spinner.appendChild(document.createElement("div"))
+    spinner.appendChild(document.createElement("div"))
+    spinner.appendChild(document.createElement("div"))
+    spinner.appendChild(document.createElement("div"))
+    spinner.appendChild(document.createElement("div"))
+    return spinner
+}
