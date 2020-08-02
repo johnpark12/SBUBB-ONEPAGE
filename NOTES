@@ -1,6 +1,10 @@
-CRITICAL ISSUES:
-Must remove iframes after loading.
-Consolidate scrapers.
+Top priorities:
+Cross-compatibility with other blackboard sites.
+Proper modularization.
+Proper caching.
+Intelligent iframe use.
+Extension popup fixing.
+When link is clicked, open in new tab.
 
 So the way that app functions is by having a content script scrape and format all the relevent data which is then sent to the background page?
 Or should the scraping automatically add to the injected html?
@@ -14,9 +18,7 @@ Perhaps a tooltip or something that tells them exactly what they're doing.
 
 I want to create the effect of an element sliding out from under another element.
 
-Pre-scrape as many links as possible to reduce load time for links.
-
-Should let you
+Pre-scrape as many links as possible to reduce load time for links. I actually don't see how this is viable unless I build out a whole backend.
 
 When caching, I'll have to initialize it with a promise so that when you're looking for something, you return either the completed object or the promise.
 So actually, the onclick functions should eventually not start it but look into the cache.
@@ -46,3 +48,5 @@ I think what's happening is that the interval is being cleared for the next grab
 Must sync this properly.
 
 There's something strange with the way that querySelector works vs QSAll.
+
+Offer extensibility so that, if possible, people from other schools can input their own custom selectors.
