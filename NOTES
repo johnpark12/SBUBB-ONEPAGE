@@ -1,10 +1,10 @@
 Top priorities:
 Cross-compatibility with other blackboard sites.
 Proper modularization.
-Proper caching.
 Intelligent iframe use.
 Extension popup fixing.
 When link is clicked, open in new tab.
+Cache should re-grab if 30 min has passed.
 
 So the way that app functions is by having a content script scrape and format all the relevent data which is then sent to the background page?
 Or should the scraping automatically add to the injected html?
@@ -50,3 +50,5 @@ Must sync this properly.
 There's something strange with the way that querySelector works vs QSAll.
 
 Offer extensibility so that, if possible, people from other schools can input their own custom selectors.
+
+Perhaps a wrapper function will be necessary in order to handle multiple requests.

@@ -143,27 +143,17 @@ let showAvailable = (e) => {
     document.querySelector(".availableView").innerHTML = "";
     document.querySelector(".detailsView").innerHTML = "";
 
-    // for (let avail in whatIsAvailable){
-    //     let item = document.createElement("li");
-    //     item.id = courseID;
-    //     item.classList.add("available")
-    //     item.appendChild(document.createTextNode(avail));
-    //     item.onclick = clicked;
-    //     document.querySelector(".availableView").appendChild(item)
-    // }
-
     //Adding loader
     document.querySelector(".availableView").appendChild(loader())
 
     whatisAvailable(courseID)
     .then(availableList => {
+        // change only if same active tab
+        if (document.querySelector(".courseListView .active").textContent !== e.target.textContent){
+            return;
+        }
         //Remove loader
         document.querySelector(".availableView").innerHTML = ""
-        console.log(availableList)
-        // Loading everything into the cache.
-        for (let avail of availableList){
-            courseCache[courseID][avail.title + "Link"] = avail.link;
-        }
         // Adding Grade viewer (although not all courses will have grades)
         let gHeader = document.createElement("h3")
         gHeader.appendChild(document.createTextNode("View Grades"))
@@ -221,96 +211,74 @@ let clicked = (e) => {
             d.classList.remove("active")
         }
     });
-    // Check cache first.
-    console.log(courseCache);
-    if (linkTitle in courseCache[courseID]){
-        let content = courseCache[courseID][linkTitle]
-        console.log(content);
-        for (let parsed of content){
-            let item = document.createElement("li");
-            item.classList.add("parsed")
-            //Link
-            let link = document.createElement("a");
-            link.href = parsed.link? parsed.link: "#";
-            item.appendChild(link);
-            //Title
-            let title = document.createElement("h3");
-            title.appendChild(document.createTextNode(parsed.title))
-            link.appendChild(title)
-            // Description
-            // let description = document.createElement("p");
-            // description.appendChild(document.createTextNode(parsed.description))
-            link.appendChild(parsed.description)
+    //Placing loader
+    document.querySelector(".detailsView").appendChild(loader())
 
-            document.querySelector(".detailsView").appendChild(item)
+    let selected = canProcess[linkTitle];
+    const labelLink = e.target.querySelector("a").href;
+
+    selected(courseID, linkTitle, labelLink)
+    .then(parsedList=>{
+        // Replace ONLY IF the returned content corresponds to active tab. This is because the user might have navigated to a different tab.
+        if (document.querySelector(".availableView .active").textContent !== linkTitle){
+            return;
         }
-    }
-    else{
-        //Placing loader
-        document.querySelector(".detailsView").appendChild(loader())
+        //Remove loader
+        document.querySelector(".detailsView").innerHTML = ""
 
-        let selected = canProcess[linkTitle];
-        console.log(linkTitle)
-        console.log(courseID)
-        selected(courseID, courseCache[courseID][linkTitle + "Link"])
-        .then(parsedList=>{
-            //Remove loader
-            document.querySelector(".detailsView").innerHTML = ""
-
-            console.log(parsedList)
-            if (linkTitle === "Grades"){
-                for (let parsed of parsedList){
-                    let item = document.createElement("li");
-                    item.classList.add("parsed")
-                    //Title
-                    let title = document.createElement("h3");
-                    title.appendChild(document.createTextNode(parsed.gradedItem))
-                    item.appendChild(title)
-                    //Link
-                    if (parsed.link){
-                        let extLink = document.createElement("a")
-                        extLink.href = parsed.link
-                        let extLinkIcon = document.createElement("img")
-                        extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
-                        extLink.appendChild(extLinkIcon)
-                        item.appendChild(extLink)
-                    }
-                    // Grade View
-                    item.appendChild(document.createTextNode(parsed.gotScore))
-                    item.appendChild(document.createTextNode(parsed.maxScore))
-        
-                    document.querySelector(".detailsView").appendChild(item)
-                }
-            }
-            else{
-                for (let parsed of parsedList){
-                    console.log(parsed)
-                    let item = document.createElement("li");
-                    item.classList.add("parsed")
-                    //Title
-                    let title = document.createElement("h3");
-                    title.appendChild(document.createTextNode(parsed.title))
-                    item.appendChild(title)
-                    //Link
+        console.log(parsedList)
+        if (linkTitle === "Grades"){
+            for (let parsed of parsedList){
+                let item = document.createElement("li");
+                item.classList.add("parsed")
+                //Title
+                let title = document.createElement("h3");
+                title.appendChild(document.createTextNode(parsed.gradedItem))
+                item.appendChild(title)
+                //Link
+                if (parsed.link){
                     let extLink = document.createElement("a")
                     extLink.href = parsed.link
                     let extLinkIcon = document.createElement("img")
                     extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
                     extLink.appendChild(extLinkIcon)
                     item.appendChild(extLink)
-                    // TODO: Attachments
-                    // Description
-                    parsed.description.forEach(line=>{
-                        item.appendChild(document.createTextNode(line))
-                    })
-                    // let description = document.createElement("p");
-                    // description.appendChild()
-        
-                    document.querySelector(".detailsView").appendChild(item)
-                }   
+                }
+                // Grade View
+                item.appendChild(document.createTextNode(parsed.gotScore))
+                item.appendChild(document.createTextNode(parsed.maxScore))
+    
+                document.querySelector(".detailsView").appendChild(item)
             }
-        })
-    }
+        }
+        else{
+            for (let parsed of parsedList){
+                console.log(parsed)
+                let item = document.createElement("li");
+                item.classList.add("parsed")
+                //Title
+                let title = document.createElement("h3");
+                title.appendChild(document.createTextNode(parsed.title))
+                item.appendChild(title)
+                //Link
+                let extLink = document.createElement("a")
+                extLink.href = parsed.link
+                let extLinkIcon = document.createElement("img")
+                extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
+                extLink.appendChild(extLinkIcon)
+                item.appendChild(extLink)
+                // TODO: Attachments
+                // Description
+                parsed.description.forEach(line=>{
+                    item.appendChild(document.createTextNode(line))
+                })
+                // let description = document.createElement("p");
+                // description.appendChild()
+    
+                document.querySelector(".detailsView").appendChild(item)
+            }   
+        }
+    })
 }
 
 //Creating a listener to make itself visible.
