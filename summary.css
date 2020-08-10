@@ -30,12 +30,12 @@
     text-align: center;
     align-items: center;
     height: 50px;
-    padding-top: 15px;
+    padding-top: 5px;
     background-color: lightgray;
 }
 
 .column{
-    height:90%;
+    height:85%;
     width: 33%;
     overflow-y: scroll;
     padding-left: 15px;
@@ -64,7 +64,7 @@ li .link{
 /* Below is the loaders */
 /* Just a little additional code for sake of positioning */
 .spinnerContainer{
-    border:1px solid black;
+    margin: auto;
     z-index: 1000000000000000000;
 }
 .lds-roller {

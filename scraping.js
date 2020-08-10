@@ -20,7 +20,77 @@ let canProcess = {
 }
 
 // Everything dynamically loaded can be accessed with this helper function. Returns a promise.
-function grabWhenLoaded(url, targetSelector, loadedSelector, isEmpty = () => false){
+async function grabWhenLoaded(url, targetSelector, loadedSelector, isEmpty = () => false){
+    var newFrame = document.createElement("iframe");
+    newFrame.src = url;
+    let frameID = "a" + Math.floor(Math.random() * 1000000000) //The 'a' is arbitrary
+    newFrame.id = frameID;
+    document.body.appendChild(newFrame);
+
+    let maxIterations = 0;
+    while (true){
+        await new Promise((resolve, reject)=>{setTimeout(r=>resolve(),500)})
+        try{
+            let forceRefresh = document.createElement("p")
+            newFrame.contentWindow.document.body.appendChild(forceRefresh);
+            // newFrame.contentWindow.document.body.querySelector(loadedSelector)
+            // FCF to "flag" if no parsable data is available.
+            if (isEmpty(newFrame.contentWindow.document.body)){
+                //Remove iframe on failure
+                document.body.removeChild(document.getElementById(frameID));
+                reject("no relevent data");
+            }
+            //My theory is that creating a new element and attaching it to the parent will force a DOM refresh of the JS model.
+            // As much as I'd like to use something else, there's something about querySelector that makes this work
+            // What's even more unusual is that when manipulating the DOM on a browser, I get inconsistent results selecting the iframe even though I'm sure it's already attached on the page.
+            // I suspect it's something about querySelector that forces the browser to refresh it's DOM model.
+            if (newFrame.contentWindow.document.body.querySelector(loadedSelector)){
+                break
+            }
+            if (maxIterations > 120){
+                console.log("timed out");
+                clearInterval(checkLoaded);
+                reject("timeout");
+            }
+        }
+        catch (e){
+            // console.log(e)
+        }
+    }
+    await new Promise((resolve, reject)=>{setTimeout(r=>resolve(),1000)})
+    while (true){
+        await new Promise((resolve, reject)=>{setTimeout(r=>resolve(),500)})
+
+        try{
+            // Determine if number of elements is the same as with targetSelector
+            if (newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length > 0
+            && newFrame.contentWindow.document.body.querySelectorAll(loadedSelector).length === newFrame.contentWindow.document.body.querySelectorAll(targetSelector).length){
+                console.log("Loaded:")
+                console.log(newFrame.contentWindow.document.body.querySelectorAll(loadedSelector));
+                console.log("Target:")
+                console.log(newFrame.contentWindow.document.body.querySelectorAll(targetSelector));
+                break;
+            }
+        }
+        catch (e){
+            // console.log(e)
+        }
+    }
+    let frameBody = newFrame.contentWindow.document.body
+    let frameTarget = newFrame.contentWindow.document.body.querySelectorAll(targetSelector)
+    //Now that we're done, removing frame.
+    document.body.removeChild(document.getElementById(frameID));
+    return ({
+        "body": frameBody,
+        "target": frameTarget
+    });    
+}
+
+// Yet another scraper - this one works through navigation.
+// It compares the link that it must go to with the location that the iframe is currently on.
+// The process can be split into two - Navigation then loading.
+// Would also require me to 
+function grabWhenLoadedOld(url, targetSelector, loadedSelector, isEmpty = () => false){
     var newFrame = document.createElement("iframe");
     newFrame.src = url;
     let frameID = "a" + Math.floor(Math.random() * 1000000000) //The 'a' is arbitrary
@@ -33,15 +103,18 @@ function grabWhenLoaded(url, targetSelector, loadedSelector, isEmpty = () => fal
                 maxIterations++;
                 // FCF to "flag" if no parsable data is available.
                 if (isEmpty(newFrame.contentWindow.document.body)){
-                    reject("none");
+                    //Remove iframe on failure
+                    document.body.removeChild(document.getElementById(frameID));
+                    reject("no relevent data");
                 }
+                //My theory is that creating a new element and attaching it to the parent will force a DOM refresh of the JS model.
+                // let forceRefresh = newFrame.contentWindow.document.createElement("p")
+                // newFrame.contentWindow.document.appendChild(forceRefresh);
+                // newFrame.contentWindow.document.body.querySelector(loadedSelector)
                 // As much as I'd like to use something else, there's something about querySelector that makes this work
                 // What's even more unusual is that when manipulating the DOM on a browser, I get inconsistent results selecting the iframe even though I'm sure it's already attached on the page.
                 // I suspect it's something about querySelector that forces the browser to refresh it's DOM model.
                 if (newFrame.contentWindow.document.body.querySelector(loadedSelector)){
-                // if (document.getElementById(frameID).contentWindow.document.body.querySelectorAll(loadedSelector) > 0){
-                    // clearInterval(checkLoaded);
-                    // var checkAllLoaded = setInterval(function(){ 
                     setTimeout(function(){ 
                         try{
                             // Determine if number of elements is the same as with targetSelector
@@ -81,10 +154,6 @@ function grabWhenLoaded(url, targetSelector, loadedSelector, isEmpty = () => fal
     })
 }
 
-// Yet another scraper - this one works through navigation.
-// It compares the link that it must go to with the location that the iframe is currently on.
-// The process can be split into two - Navigation then loading.
-// Would also require me to 
 
 //Should create a function here that works with onload instead, to deal with certain elements.
 //Generally the above function is slightly faster and actually works in more cases, but this one is cleaner.
@@ -161,15 +230,17 @@ function courseAndGrades(){
 
 // Grab the grades (update with IDs in the future).
 function grabGrades(courseID){
+    if ("Grades" in courseCache[courseID]){
+        return courseCache[courseID]["Grades"]
+    }
     let url = `https://blackboard.stonybrook.edu/webapps/bb-mygrades-bb_bb60/myGrades?course_id=${courseID}&stream_name=mygrades`;
-    return new Promise((resolve, reject)=>{
+    let loadingGrades = new Promise((resolve, reject)=>{
         let checkEmpty = (body) => {
             // Find the total row
-            // let allCalculatedRows = Array.from(body.querySelectorAll(".calculatedRow"))
-            // let fRow = allCalculatedRows.filter(calcRow => calcRow.querySelector(".gradable").textContent.trim().split("\n")[0]
-            // let totalGrade = fRow.querySelector(".grade").textContent.trim();
-            // return totalGrade === "-";
-            return false;
+            let allCalculatedRows = Array.from(body.querySelectorAll(".calculatedRow"))
+            let fRow = allCalculatedRows.filter(calcRow => calcRow.querySelector(".gradable").textContent.trim().split("\n"))[0]
+            let totalGrade = fRow.querySelector(".grade").textContent.trim();
+            return totalGrade === "-";
         }
         grabWhenLoaded(url, ".graded_item_row", ".graded_item_row span.grade", checkEmpty)
         .then(({target})=>{
@@ -191,22 +262,9 @@ function grabGrades(courseID){
             reject();
         })
     });
+    courseCache[courseID]["Grades"] = loadingGrades
+    return loadingGrades;
 }
-
-// grabWhenLoaded("https://blackboard.stonybrook.edu/webapps/streamViewer/streamViewer?cmd=view&streamName=mygrades&globalNavigation=false", ".stream_item", ".stream_item")
-// .then((courseList)=>{
-//     let d = courseList[0];
-//     let url = "https://blackboard.stonybrook.edu" + d.getAttribute("bb:rhs");
-//     console.log("grabbing grades from url " + url);
-//     grabWhenLoaded(url, ".graded_item_row", ".graded_item_row span.grade")
-//     .then((gradeList)=>{
-//         console.log(gradeList);
-//         gradeList.forEach((grade)=>{
-//             console.log(grade.querySelector("div.cell.gradable > a").textContent);
-//             console.log(grade.querySelector("span.grade").textContent);
-//         })
-//     })
-// })
 
 // Check which "items" the course has available. Lectures, Documents, etc.
 // This should also have caching.
@@ -259,7 +317,6 @@ function grabAnnouncementsLoad(courseID, label, url){
 }
 
 // Grab the assignments
-// TODO: Doesn't link to assignment submission properly.
 function grabAssignments (courseID, url){
     return new Promise((resolve, reject)=>{
         grabWhenLoaded(url, ".contentList>li", ".contentList>li>div>h3", (body)=>body.querySelectorAll(".noItems").length > 0)
@@ -319,7 +376,7 @@ function grabDocuments(courseID, url){
 }
 
 
-// Grab the Syallabus.
+// Abstract grabber
 function grabGeneral(courseID, label, url){
     console.log(`${courseID} ${label} ${url}`)
     // If something already exists in the cache, return it.

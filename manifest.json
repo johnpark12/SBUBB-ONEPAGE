@@ -2,16 +2,19 @@
     "manifest_version": 2,
   
     "name": "SBU Blackboard Quick View Extension",
-    "description": "Just something quick to let you view ",
+    "description": "Quickly view important blackboard items",
     "version": "0.5",
   
     "browser_action": {
-     "default_popup": "popup.html"
+     "default_popup": "popup.html",
+     "default_icon": "mainIcon.png"
     },
     "permissions": [
      "activeTab",
      "storage"
      ],
+     "icons": {
+       "128": "mainIcon.png" },
      "content_scripts": [
         {
         "matches": ["https://blackboard.stonybrook.edu/webapps/portal/execute/tabs/tabAction?tab_tab_group_id=_4_1"],

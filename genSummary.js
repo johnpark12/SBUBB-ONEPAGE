@@ -1,6 +1,6 @@
 // After some thought, I think that the best approach is to make everything "onclick", because otherwise we run into issues with rate limiting.
 // Since we're segmenting the sections out, this section should only contain scripts to build out the page based on JSON returned from scraping.js.
-// window.onload = () => {
+function buildInterface(){
     // Building the background
     let background = document.createElement("div");
     background.id = "mainContainer";
@@ -44,6 +44,13 @@
         //Experiment with deloading
         document.body.innerHTML = "";
         document.body.appendChild(background);
+
+        // TEST FEATURE
+        //Adding single iframe
+        // var newFrame = document.createElement("iframe");
+        // newFrame.id = "singleFrame";
+        // document.body.appendChild(newFrame);
+
         //Removing the loader
         document.querySelector(".courseListView").innerHTML = ""
         //Sorting courses according to date.
@@ -56,6 +63,11 @@
             let semCourses = document.createElement("ul")
             itemSemester.appendChild(semCourses);
             for (let course of courseGroup[pCourseKey]){
+
+                // if (pCourseKey == "Spring 2020"){
+                //     grabGrades(course.id)
+                // }
+
                 let item = document.createElement("li");
                 item.id = course.id;
                 item.classList.add("course")
@@ -72,7 +84,7 @@
             document.querySelector(".courseListView").appendChild(itemSemester);
         }
     });
-// } 
+}
 
 // These collection of functions is designed to build out the info bit by bit, dynamically.
 // I should possibly look to the old callback use of "next" as a model as to how to asynchronously build out the interface.
@@ -143,6 +155,29 @@ let showAvailable = (e) => {
     document.querySelector(".availableView").innerHTML = "";
     document.querySelector(".detailsView").innerHTML = "";
 
+
+
+    // Adding Grade viewer (although not all courses will have grades, at least we start knowing the URL to get the grades from)
+    let gHeader = document.createElement("h3")
+    gHeader.appendChild(document.createTextNode("View Grades"))
+    document.querySelector(".availableView").appendChild(gHeader)
+    let item = document.createElement("li");
+    item.classList.add("available")
+    item.appendChild(document.createTextNode("Grades"));
+    //Adding external link
+    let extLink = document.createElement("a")
+    extLink.href = `https://blackboard.stonybrook.edu/webapps/bb-mygrades-bb_bb60/myGrades?course_id=${courseID}&stream_name=mygrades`
+    let extLinkIcon = document.createElement("img")
+    extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
+    extLink.appendChild(extLinkIcon)
+    item.appendChild(extLink)
+    item.onclick = clicked;
+    document.querySelector(".availableView").appendChild(item)
+    // Header for menuItems
+    let aHeader = document.createElement("h3")
+    aHeader.appendChild(document.createTextNode("Menu Items"))
+    document.querySelector(".availableView").appendChild(aHeader)
+
     //Adding loader
     document.querySelector(".availableView").appendChild(loader())
 
@@ -153,29 +188,8 @@ let showAvailable = (e) => {
             return;
         }
         //Remove loader
-        document.querySelector(".availableView").innerHTML = ""
-        // Adding Grade viewer (although not all courses will have grades)
-        let gHeader = document.createElement("h3")
-        gHeader.appendChild(document.createTextNode("View Grades"))
-        document.querySelector(".availableView").appendChild(gHeader)
-        let item = document.createElement("li");
-        item.classList.add("available")
-        item.appendChild(document.createTextNode("Grades"));
-        //Adding external link
-        let extLink = document.createElement("a")
-        extLink.href = `https://blackboard.stonybrook.edu/webapps/bb-mygrades-bb_bb60/myGrades?course_id=${courseID}&stream_name=mygrades`
-        let extLinkIcon = document.createElement("img")
-        extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
-        extLink.appendChild(extLinkIcon)
-        item.appendChild(extLink)
-
-        item.onclick = clicked;
-        document.querySelector(".availableView").appendChild(item)
+        document.querySelector(".availableView").removeChild(document.querySelector(".availableView>.spinnerContainer"))
         
-        // Header for availableView column
-        let aHeader = document.createElement("h3")
-        aHeader.appendChild(document.createTextNode("Menu Items"))
-        document.querySelector(".availableView").appendChild(aHeader)
         //Creating list of available
         for (let avail of availableList){
             if (avail.title in canProcess){
@@ -260,14 +274,24 @@ let clicked = (e) => {
                 let title = document.createElement("h3");
                 title.appendChild(document.createTextNode(parsed.title))
                 item.appendChild(title)
-                //Link
+                //ExtLink
                 let extLink = document.createElement("a")
                 extLink.href = parsed.link
                 let extLinkIcon = document.createElement("img")
                 extLinkIcon.src="https://img.icons8.com/material-sharp/20/000000/external-link.png"
                 extLink.appendChild(extLinkIcon)
-                item.appendChild(extLink)
-                // TODO: Attachments
+                title.appendChild(extLink) //Attaching it to title to make it inline
+                // Attachments
+                if (parsed.attachments){
+                    item.appendChild(document.createTextNode("Attachments:"))
+                }
+                parsed.attachments.forEach(attachment=>{
+                    let aItem = document.createElement("li")
+                    let aLink = document.createElement("a")
+                    aLink.href = attachment.link
+                    aLink.appendChild(document.createTextNode(attachment.text))
+                    item.appendChild(aLink)
+                })
                 // Description
                 parsed.description.forEach(line=>{
                     item.appendChild(document.createTextNode(line))
@@ -286,7 +310,7 @@ chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
         console.log(request);
         if (request.makeVisible){
-            document.getElementById("reportContainer").style.visibility = "visible";
+            buildInterface()
         }
 });
 
@@ -323,5 +347,5 @@ function loader(){
     spinner.appendChild(document.createElement("div"))
     spinner.appendChild(document.createElement("div"))
     spinner.appendChild(document.createElement("div"))
-    return spinner
+    return spinnerContainer
 }
